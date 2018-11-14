@@ -34,6 +34,7 @@ firstX = int()      #click and drag drawing
 firstY = int()
 mouse = bool()
 outlinePen = list() #pen outline id
+pastPoints = list() #polygon drawing
 previousX = int()   #pen drawing
 previousY = int()
 redo = list()       #used for redo
@@ -93,7 +94,7 @@ def canvasShape(*args, **kwargs):
         raise TypeError('canvasShape expected a keyword fill or outline')
     if 'size' not in kargs:
         kargs['size'] = 1
-    if 'outline' in kargs and 'fill' not in kargs:
+    if (('outline' in kargs) and ('fill' not in kargs)):
         kargs['fill'] = ''
     if 'outline' not in kargs:
         kargs['outline'] = kargs['fill']
@@ -105,11 +106,21 @@ def canvasShape(*args, **kwargs):
             fill = kargs['fill']
         )
     if (kargs['shape'] == 'line'):
-        return canvas.create_line(
-            x1, y1, x2, y2,
-            fill = kargs['fill'],
-            width = kargs['size']
-        )
+        if ((x1 != x2) and (y1 != y2)):
+            return canvas.create_line(
+                x1, y1, x2, y2,
+                fill = kargs['fill'],
+                width = kargs['size']
+            )
+        else:
+            #get corners for specified size
+            top = m.floor(kargs['size']/2)
+            bottom = m.ceil(kargs['size']/2) - 1
+            return canvas.create_oval(
+                x1 - top, y1 - top, x1 + bottom, y1 + bottom,
+                fill = kargs['fill'],
+                outline = kargs['outline']
+            )
     elif (kargs['shape'] in ('circle', 'square')):
         #get corners for specified size
         top = m.floor(kargs['size']/2)
@@ -168,6 +179,25 @@ def canvasShape(*args, **kwargs):
                 fill = kargs['outline'],
                 outline = kargs['outline'],
                 width = 1
+            )
+    elif (kargs['shape'] == 'polygon'):
+        if ((args[0::2].count(args[0]) < len(args[0::2]))
+            and (args[0::2].count(args[0]) < len(args[0::2])
+        )):
+            return canvas.create_polygon(
+                *args,
+                fill = kargs['fill'],
+                outline = kargs['outline'],
+                width = kargs['size']
+            )
+        else:
+            #get corners for specified size
+            top = m.floor(kargs['size']/2)
+            bottom = m.ceil(kargs['size']/2) - 1
+            return canvas.create_oval(
+                x1 - top, y1 - top, x1 + bottom, y1 + bottom,
+                fill = kargs['outline'],
+                outline = kargs['outline']
             )
     else:
         pass
@@ -240,6 +270,7 @@ def reset(event):
     global firstX
     global firstY
     global mouse
+    global pastPoints
     global previousX
     global previousY
     global redo
@@ -254,6 +285,10 @@ def reset(event):
     #set the mouse down location
     firstX = event.x
     firstY = event.y
+    
+    #adds a point to the polygon
+    if (strokeType in ('polygon', 'filled polygon')):
+        pastPoints.extend((event.x, event.y))
 
     #update saved
     saved = False
@@ -261,9 +296,9 @@ def reset(event):
     #update title
     window.title(('*Primitive Paint - ' + fileName))
 
-    #update current stroke
-    stroke += 1
-    actions.append([])
+    #update current stroke if not polygon
+    if (strokeType not in ('polygon', 'filled polygon')):
+        stroke += 1; actions.append([])
 
     #empty redo list
     if (len(redo) > 1):
@@ -368,27 +403,16 @@ def end(event):
             event.x, event.y,
             shape = 'rectangle'
             if ((event.x - firstX != 0)
-            and (event.y - firstY))
+                and (event.y - firstY))
             else 'square',
             fill = current
-            if (strokeType == 'filled rectangle')
+            if ((strokeType == 'filled rectangle')
+                or ((event.x - firstX != 0)
+                and (event.y - firstY)))
             else '',
             outline = current,
             size = sizePen.get()
         ))
-    elif (strokeType in ('polygon', 'filled polygon')):
-        actions[stroke].append(canvasShape(
-            firstX, firstY,
-            event.x, event.y,
-            shape = 'rectangle',
-            fill = current
-            if (strokeType == 'filled polygon')
-            else '',
-            outline = current,
-            size = sizePen.get()
-        ))
-    
-    elif False: pass
 
     #call the outline function
     outline(event)
@@ -398,6 +422,58 @@ def end(event):
     previousY = event.y
 #end end(event)
 
+#right click detector function
+def finish(event):
+    #reference variables outside function
+    global actions
+    global current
+    global pastPoints
+    global sizePen
+    global stroke
+    global strokeType
+
+    #increase stroke amount
+    stroke += 1; actions.append([])
+
+    #check if stroke type is polygon or filled polygon
+    if (strokeType not in ('polygon', 'filled polygon')): return
+
+    #check if there's actually points in the polygon
+    if ((len(pastPoints) > 1) and (len(pastPoints)%2 == 0)):
+        if (len(pastPoints) == 2):
+            #make a point
+            actions[stroke].append(canvasShape(
+                *pastPoints,
+                shape = 'circle',
+                fill = current,
+                size = sizePen.get()
+            ))
+        elif (len(pastPoints) == 4):
+            #make a line
+            actions[stroke].append(canvasShape(
+                *pastPoints,
+                shape = 'line',
+                fill = current,
+                size = sizePen.get()
+            ))
+        else:
+            #make a polygon
+            actions[stroke].append(canvasShape(
+                *pastPoints,
+                shape = 'polygon',
+                fill = current
+                if (strokeType == 'filled polygon')
+                else '',
+                outline = current,
+                size = sizePen.get()
+            ))
+        #empty the points
+        del pastPoints[:]
+
+    #call the outline function
+    outline(event)
+#end finish(event)
+
 #mouse motion detector function
 def outline(event=None):
     #reference variables outside function
@@ -406,6 +482,7 @@ def outline(event=None):
     global firstY
     global mouse
     global outlinePen
+    global pastPoints
     global previousX
     global previousY
 
@@ -443,7 +520,7 @@ def outline(event=None):
         currentX = event.x
         currentY = event.y
 
-    #draws a simple thing
+    #delete all items in outline
     if outlinePen:
         #delete the outline
         for item in outlinePen: canvas.delete(item)
@@ -497,6 +574,18 @@ def outline(event=None):
             outline = current,
             size = sizePen.get()
         ))
+    elif ((strokeType in ('polygon', 'filled polygon')) and pastPoints):
+        #if type is polygon or filled polygon
+        outlinePen.append(canvasShape(
+            *pastPoints,
+            currentX, currentY,
+            shape = 'polygon',
+            fill = current
+            if (strokeType == 'filled polygon')
+            else '',
+            outline = current,
+            size = sizePen.get()
+        ))
 
     #draws outline of selected size
     if (strokeType in ('rectangle', 'filled rectangle')):
@@ -530,6 +619,9 @@ def outline(event=None):
     #update line start for next line
     previousX = currentX
     previousY = currentY
+    
+    #update screen
+    canvas.update()
 #end outline(event)
 
 #changes colour with a popup
@@ -571,7 +663,15 @@ def resize(event):
 #change drawing type
 def strokeChange(position):
     #reference variables outside function
+    global pastPoints
     global strokeType
+    
+    #declaration of internal variables
+    lastTypePolygon = bool()
+
+    #check if stroke type is a polygon
+    if (lastTypePolygon in ('polygon', 'filled polygon')):
+        lastTypePolygon = True
 
     #function to reset background
     def bgReset():
@@ -614,6 +714,13 @@ def strokeChange(position):
         if (position == positionCheck) and (strokeType != strokeCheck):
             strokeType = strokeCheck; bgReset()
     #end for
+
+    #delete the last points if the last type was a polygon and now it isnt
+    if (lastTypePolygon and strokeType not in ('polygon', 'filled polygon')):
+        del pastPoints[:]
+
+    #call outline
+    outline()
 #end strokeChange(event)
 
 def undoLast(event):
@@ -887,9 +994,9 @@ def openAny(*args):
     line = int()
 
     #notify user if unsaved
-    if (not saved) and (not tkmessage.askyesno(
+    if ((not saved) and (not tkmessage.askyesno(
         'Verify', 'Are you sure you want to leave this file unsaved?'
-    )): return
+    ))): return
 
     #open file chooser
     fileName = tkfile.askopenfilename(
@@ -986,8 +1093,9 @@ canvas.grid(
     sticky = 'nsew'
 )
 
-#paint when clicked and resize when scrolled
+#paint when clicked, resize when scrolled, end polygon when right clicked
 canvas.bind('<Button-1>', reset)
+canvas.bind('<Button-3>', finish)
 canvas.bind('<B1-Motion>', paint)
 canvas.bind('<ButtonRelease-1>', end)
 canvas.bind('<MouseWheel>', resize)
@@ -1007,7 +1115,7 @@ window.bind('<Control-a>', lambda x: saveAny(True))
 window.bind('<Control-o>', openAny)
 
 #debug with Ctrl + Alt + Q
-window.bind('<Control-Alt-q>', sys.exit)
+window.bind('<Control-Alt-q>', lambda x: sys.exit())
 
 #create the logo and put on top left
 logo = tk.Canvas(
