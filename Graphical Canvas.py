@@ -106,21 +106,11 @@ def canvasShape(*args, **kwargs):
             fill = kargs['fill']
         )
     if (kargs['shape'] == 'line'):
-        if ((x1 != x2) and (y1 != y2)):
-            return canvas.create_line(
-                x1, y1, x2, y2,
-                fill = kargs['fill'],
-                width = kargs['size']
-            )
-        else:
-            #get corners for specified size
-            top = m.floor(kargs['size']/2)
-            bottom = m.ceil(kargs['size']/2) - 1
-            return canvas.create_oval(
-                x1 - top, y1 - top, x1 + bottom, y1 + bottom,
-                fill = kargs['fill'],
-                outline = kargs['outline']
-            )
+        return canvas.create_line(
+            x1, y1, x2, y2,
+            fill = kargs['fill'],
+            width = kargs['size']
+        )
     elif (kargs['shape'] in ('circle', 'square')):
         #get corners for specified size
         top = m.floor(kargs['size']/2)
@@ -403,12 +393,12 @@ def end(event):
             event.x, event.y,
             shape = 'rectangle'
             if ((event.x - firstX != 0)
-                and (event.y - firstY))
+                and (event.y - firstY != 0))
             else 'square',
             fill = current
             if ((strokeType == 'filled rectangle')
-                or ((event.x - firstX != 0)
-                and (event.y - firstY)))
+                or ((firstX == event.x)
+                and (firstY == event.y)))
             else '',
             outline = current,
             size = sizePen.get()
@@ -839,9 +829,7 @@ def redoLast(*args):
                         if ((option == 'line')
                             or (redo[-1][item + 2][-1] != '#'))
                         else '',
-                        outline = redo[-1][item + 2][:-1]
-                        if (redo[-1][item + 2][-1] == '#')
-                        else redo[-1][item + 2],
+                        outline = redo[-1][item + 2][:7],
                         size = int(float(redo[-1][item + 3]))
                         if redo[-1][item + 3] else 1
                     ))
@@ -859,9 +847,7 @@ def redoLast(*args):
                 if ((redo[-1][1] == 'line')
                     or (redo[-1][3][-1] != '#'))
                 else '',
-                outline = redo[-1][3][:-1]
-                if (redo[-1][3][-1] == '#')
-                else redo[-1][3],
+                outline = redo[-1][3][:7],
                 size = int(float(redo[-1][4]))
                 if redo[-1][4] else 1
             ))
@@ -990,7 +976,7 @@ def openAny(*args):
     global stroke
 
     #declaration of internal variables
-    fileRead = []
+    fileRead = list()
     line = int()
 
     #notify user if unsaved
@@ -1048,11 +1034,9 @@ def openAny(*args):
                 shape = fileRead[line + 1],
                 fill = fileRead[line + 3]
                 if ((fileRead[line + 1] == 'line')
-                    or (fileRead[line + 3][-1] == '#'))
+                    or (fileRead[line + 3][-1] != '#'))
                 else '',
-                outline = fileRead[line + 3][:-1]
-                if (fileRead[line + 3][-1] == '#')
-                else fileRead[line + 3],
+                outline = fileRead[line + 3][:7],
                 size = int(float(fileRead[line + 4]))
                 if fileRead[line + 4] else 1
             ))
@@ -1075,6 +1059,39 @@ def openAny(*args):
     window.title(('Primitive Paint - ' + fileName))
 #end openAny(*args)
 
+def clearAll(*args):
+    #reference variables outside function
+    global actions
+    global fileName
+    global redo
+    global saved
+    global stroke
+
+    #notify user of leaving of file
+    if not saved:
+        if not tkmessage.askyesno(
+            'Verify', 'Are you sure you want to leave this file unsaved?'
+        ): return
+    elif not tkmessage.askyesno(
+        'Verify', 'Are you sure you want to leave this file?'
+    ): return
+
+    #reset actions and stroke
+    canvas.delete('all')
+    del actions[1:]
+    del redo[1:]
+    stroke = 0
+
+    #update file name
+    fileName = 'untitled.txt'
+
+    #update saved
+    saved = True
+
+    #update title
+    window.title(('Primitive Paint - untitled.txt'))
+#end clearAll(*args)
+
 #create the canvas
 canvas = tk.Canvas(
     window,
@@ -1092,6 +1109,31 @@ canvas.grid(
     columnspan = 6,
     sticky = 'nsew'
 )
+
+#create the menu bar
+topMenu = tk.Menu(window)
+window.config(menu = topMenu)
+fileMenu = tk.Menu(topMenu)
+editMenu = tk.Menu(topMenu)
+topMenu.add_cascade(label = 'File', menu = fileMenu)
+topMenu.add_cascade(label = 'Edit', menu = editMenu)
+
+#create the file menu dropdown
+fileMenu.add_command(label = 'New', command = clearAll)
+fileMenu.add_command(label = 'Open...', command = openAny)
+fileMenu.add_command(
+    label = 'Save',
+    command = lambda x: saveAny(False)
+)
+fileMenu.add_command(
+    label = 'Save As...',
+    command = lambda x: saveAny(True)
+)
+
+#create the edit menu dropdown
+editMenu.add_command(label = 'Undo', command = undoLast)
+editMenu.add_command(label = 'Redo', command = redoLast)
+editMenu.add_command(label = 'Redo All', command = redoAll)
 
 #paint when clicked, resize when scrolled, end polygon when right clicked
 canvas.bind('<Button-1>', reset)
@@ -1116,6 +1158,13 @@ window.bind('<Control-o>', openAny)
 
 #debug with Ctrl + Alt + Q
 window.bind('<Control-Alt-q>', lambda x: sys.exit())
+
+#remind file is unsaved when window x is pressed
+window.bind('WM_DELETE_WINDOW', (
+    lambda x: window.destroy() if ((not saved) and (not tkmessage.askyesno(
+        'Verify', 'Are you sure you want to leave this file unsaved?'
+    ))) else None
+))
 
 #create the logo and put on top left
 logo = tk.Canvas(
