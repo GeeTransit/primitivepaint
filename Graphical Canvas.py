@@ -171,9 +171,9 @@ def canvasShape(*args, **kwargs):
                 width = 1
             )
     elif (kargs['shape'] == 'polygon'):
-        if ((args[0::2].count(args[0]) < len(args[0::2]))
-            and (args[0::2].count(args[0]) < len(args[0::2])
-        )):
+        if ((args[0::2].count(args[0]) < len(args)/2)
+            or (args[1::2].count(args[1]) < len(args)/2)
+        ):
             return canvas.create_polygon(
                 *args,
                 fill = kargs['fill'],
@@ -249,7 +249,7 @@ def paint(event=None):
     #update line start for next line
     previousX = currentX
     previousY = currentY
-#end paint(event)
+#end paint(event=None)
 
 #resets the line start
 def reset(event):
@@ -612,7 +612,18 @@ def outline(event=None):
     
     #update screen
     canvas.update()
-#end outline(event)
+    
+    #update status
+    if (strokeType not in ('polygon', 'filled polygon')):
+        statusMouse.config(text = f'{currentX}, {currentY}')
+        statusLast.config(text = f'{firstX}, {firstY}' if mouse else '')
+    elif (strokeType in ('polygon', 'filled polygon')):
+        statusMouse.config(text = f'{currentX}, {currentY}')
+        statusLast.config(
+            text = f'{pastPoints[-2]}, {pastPoints[-1]}'
+            if pastPoints else ''
+        )
+#end outline(event=None)
 
 #changes colour with a popup
 def colourChange(*args):
@@ -628,7 +639,7 @@ def colourChange(*args):
 
     #update display
     display.config(bg = current)
-#end change()
+#end colourChange(*args)
 
 #resize with the scrollwheel
 def resize(event):
@@ -701,19 +712,20 @@ def strokeChange(position):
         'polygon', 'filled polygon'
     )):
         #check if a button was pressed and is different than the current
-        if (position == positionCheck) and (strokeType != strokeCheck):
+        if ((position == positionCheck) and (strokeType != strokeCheck)):
             strokeType = strokeCheck; bgReset()
     #end for
 
     #delete the last points if the last type was a polygon and now it isnt
-    if (lastTypePolygon and strokeType not in ('polygon', 'filled polygon')):
-        del pastPoints[:]
+    if ((lastTypePolygon)
+        and (strokeType not in ('polygon', 'filled polygon'))
+    ): del pastPoints[:]
 
     #call outline
     outline()
-#end strokeChange(event)
+#end strokeChange(position)
 
-def undoLast(event):
+def undoLast(*args):
     #reference variables outside function
     global actions
     global fileName
@@ -752,7 +764,7 @@ def undoLast(event):
         #canvas.update()
         del actions[-1]
         stroke -= 1
-#end undoLast(event)
+#end undoLast(*args)
 
 def undoSingle(*args):
     #reference variables outside function
@@ -793,7 +805,7 @@ def undoSingle(*args):
         #delete last substroke, deleting full stroke if needed
         if (len(actions[-1]) == 1): del actions[-1]; stroke -= 1
         else: del actions[-1][-1]
-#end undosingle(event)
+#end undoSingle(*args)
 
 def redoLast(*args):
     #reference variables outside function
@@ -853,13 +865,13 @@ def redoLast(*args):
             ))
             #delete last redo list
             del redo[-1]
-#end redo(event)
+#end redoLast(*args)
 
 def redoAll(*args):
     #call redoLast() until there's no more left to redo
     for i in redo[1:]: redoLast()
     #end for
-#end redoAll(event)
+#end redoAll(*args)
 
 def saveAny(saveAs, *args):
     #reference variables outside function
@@ -1123,11 +1135,11 @@ fileMenu.add_command(label = 'New', command = clearAll)
 fileMenu.add_command(label = 'Open...', command = openAny)
 fileMenu.add_command(
     label = 'Save',
-    command = lambda x: saveAny(False)
+    command = lambda *args: saveAny(False)
 )
 fileMenu.add_command(
     label = 'Save As...',
-    command = lambda x: saveAny(True)
+    command = lambda *args: saveAny(True)
 )
 
 #create the edit menu dropdown
@@ -1159,12 +1171,15 @@ window.bind('<Control-o>', openAny)
 #debug with Ctrl + Alt + Q
 window.bind('<Control-Alt-q>', lambda x: sys.exit())
 
+#tell user file is unsaved
+def closeWindow(*args):
+    if (not saved) and (not tkmessage.askyesno(
+        'Verify', 'Are you sure you want to exit with file unsaved?'
+    )): return
+    else: window.destroy()
+
 #remind file is unsaved when window x is pressed
-window.bind('WM_DELETE_WINDOW', (
-    lambda x: window.destroy() if ((not saved) and (not tkmessage.askyesno(
-        'Verify', 'Are you sure you want to leave this file unsaved?'
-    ))) else None
-))
+window.protocol('WM_DELETE_WINDOW', closeWindow)
 
 #create the logo and put on top left
 logo = tk.Canvas(
@@ -1327,11 +1342,48 @@ display.grid(
 #change colour when clicked
 display.bind('<Button-1>', colourChange)
 
+#create the status bar and put on bottom
+status = tk.Frame(
+    window,
+    borderwidth = 0,
+    relief = 'solid'
+)
+status.grid(
+    column = 0,
+    row = 2,
+    columnspan = 6,
+    sticky = 'nsew'
+)
+
+#create the status text labels
+statusMouse = tk.Label(
+    status,
+    text = '0, 0',
+    width = 30,
+    anchor = 'w',
+    padx = 5,
+    borderwidth = 0,
+    relief = 'flat'
+)
+statusMouse.grid(column = 0, row = 0, sticky = 'nsew')
+statusLast = tk.Label(
+    status,
+    text = '',
+    anchor = 'w',
+    padx = 5,
+    borderwidth = 0,
+    relief = 'flat'
+)
+statusLast.grid(column = 1, row = 0, sticky = 'nsew')
+statusEnd = tk.Label(status, borderwidth = 0, relief = 'flat')
+statusEnd.grid(column = 2, row = 0, sticky = 'nsew')
+
 #let window resize once possible
 window.columnconfigure(1, weight = 1)
 window.rowconfigure(1, weight = 1)
 canvas.columnconfigure(1, weight = 1)
 canvas.rowconfigure(1, weight = 1)
+status.columnconfigure(2, weight = 1)
 
 #loop until the end of the window's life
 tk.mainloop()
