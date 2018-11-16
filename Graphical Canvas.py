@@ -59,9 +59,13 @@ window.title('Primitive Paint - untitled.txt')
 
 #declaration of window variables
 sizePen = tk.IntVar()
+statusX = tk.StringVar()
+statusY = tk.StringVar()
 
 #default window values
 sizePen.set(1.0)
+statusX.set('0')
+statusY.set('0')
 
 #makes a shape at specified location and returns the value
 def canvasShape(*args, **kwargs):
@@ -615,10 +619,12 @@ def outline(event=None):
     
     #update status
     if (strokeType not in ('polygon', 'filled polygon')):
-        statusMouse.config(text = f'{currentX}, {currentY}')
+        statusX.set(str(currentX))
+        statusY.set(str(currentY))
         statusLast.config(text = f'{firstX}, {firstY}' if mouse else '')
     elif (strokeType in ('polygon', 'filled polygon')):
-        statusMouse.config(text = f'{currentX}, {currentY}')
+        statusX.set(str(currentX))
+        statusY.set(str(currentY))
         statusLast.config(
             text = f'{pastPoints[-2]}, {pastPoints[-1]}'
             if pastPoints else ''
@@ -1163,9 +1169,12 @@ window.bind('<Control-Z>', undoSingle)
 window.bind('<Control-y>', redoLast)
 window.bind('<Control-Y>', redoAll)
 
-#save with Ctrl + S, save as with Ctrl + A and open with Ctrl + O
+#save with Ctrl + S and save as with Ctrl + A
 window.bind('<Control-s>', lambda x: saveAny(False))
 window.bind('<Control-a>', lambda x: saveAny(True))
+
+#new file with Ctrl + N and open file with Ctrl + O
+window.bind('<Control-n>', clearAll)
 window.bind('<Control-o>', openAny)
 
 #debug with Ctrl + Alt + Q
@@ -1355,17 +1364,48 @@ status.grid(
     sticky = 'nsew'
 )
 
-#create the status text labels
-statusMouse = tk.Label(
+#create the precision mouse controller and put on bottom left
+statusControl = tk.Frame(
     status,
-    text = '0, 0',
-    width = 30,
-    anchor = 'w',
-    padx = 5,
+    width = 71,
+    borderwidth = 0,
+    relief = 'solid'
+)
+statusControl.grid(
+    column = 0,
+    row = 0,
+    sticky = 'nsew'
+)
+
+#create the status text labels
+statusMouseX = tk.Entry(
+    statusControl,
+    state = 'disabled',
+    width = 4,
+    borderwidth = 0,
+    relief = 'flat',
+    textvariable = statusX
+)
+statusMouseX.grid(column = 0, row = 0, sticky = 'nsew')
+statusMouseSplit = tk.Label(
+    statusControl,
+    text = ', ',
+    padx = 0,
     borderwidth = 0,
     relief = 'flat'
 )
-statusMouse.grid(column = 0, row = 0, sticky = 'nsew')
+statusMouseSplit.grid(column = 1, row = 0, sticky = 'nsew')
+statusMouseY = tk.Entry(
+    statusControl,
+    state = 'disabled',
+    width = 4,
+    borderwidth = 0,
+    relief = 'flat',
+    textvariable = statusY
+)
+statusMouseY.grid(column = 2, row = 0, sticky = 'nsew')
+statusMouseEnd = tk.Label(statusControl, borderwidth = 0, relief = 'flat')
+statusMouseEnd.grid(column = 3, row = 0, sticky = 'nsew')
 statusLast = tk.Label(
     status,
     text = '',
@@ -1383,7 +1423,8 @@ window.columnconfigure(1, weight = 1)
 window.rowconfigure(1, weight = 1)
 canvas.columnconfigure(1, weight = 1)
 canvas.rowconfigure(1, weight = 1)
-status.columnconfigure(2, weight = 1)
+status.columnconfigure(1, weight = 1)
+statusControl.columnconfigure(3, weight = 1)
 
 #loop until the end of the window's life
 tk.mainloop()
