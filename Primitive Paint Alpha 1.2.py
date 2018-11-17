@@ -1,7 +1,7 @@
 ##########################################################################
 ##Program Author: George Zhang                                          ##
 ##Revision Date: Nov 12, 2018                                           ##
-##Program Name: Graphical Canvas                                        ##
+##Program Name: Primirive Paint Alpha 1.2                               ##
 ##Description: This program draws on the canvas of a tkinter window.    ##
 ##########################################################################
 
