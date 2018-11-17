@@ -1264,6 +1264,16 @@ def clearAll(*args):
     window.title(('Primitive Paint - untitled.txt'))
 #end clearAll(*args)
 
+#tell user file is unsaved
+def closeWindow(*args):
+    if not saved:
+        if not tkmessage.askyesno(
+            'Exit', 'Are you sure you want to exit with file unsaved?'
+        ): return
+        else: window.destroy()
+    else: window.destroy()
+#end closeWindow(*args)
+
 #create the canvas
 canvas = tk.Canvas(
     window,
@@ -1301,6 +1311,8 @@ fileMenu.add_command(
     label = 'Save As...',
     command = lambda *args: saveAny(True)
 )
+fileMenu.add_separator()
+fileMenu.add_command(label = 'Exit', command = closeWindow)
 
 #create the edit menu dropdown
 editMenu.add_command(label = 'Undo', command = undoLast)
@@ -1334,13 +1346,6 @@ window.bind('<Control-o>', openAny)
 
 #debug with Ctrl + Alt + Q
 window.bind('<Control-Alt-q>', lambda x: sys.exit())
-
-#tell user file is unsaved
-def closeWindow(*args):
-    if (not saved) and (not tkmessage.askyesno(
-        'Verify', 'Are you sure you want to exit with file unsaved?'
-    )): return
-    else: window.destroy()
 
 #remind file is unsaved when window x is pressed
 window.protocol('WM_DELETE_WINDOW', closeWindow)
