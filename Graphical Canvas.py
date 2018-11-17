@@ -39,6 +39,8 @@ previousX = int()   #pen drawing
 previousY = int()
 redo = list()       #used for redo
 saved = bool()      #used for saving
+statusPreX = int()  #used for checking status
+statusPreY = int()
 stroke = int()      #amount of strokes
 strokeType = str()  #stroke type
 window = str()      #main window identifier
@@ -184,7 +186,7 @@ def canvasShape(*args, **kwargs):
                 outline = kargs['outline'],
                 width = kargs['size']
             )
-        else:
+        elif (kargs['size'] > 1):
             #get corners for specified size
             top = m.floor(kargs['size']/2)
             bottom = m.ceil(kargs['size']/2) - 1
@@ -192,6 +194,11 @@ def canvasShape(*args, **kwargs):
                 x1 - top, y1 - top, x1 + bottom, y1 + bottom,
                 fill = kargs['outline'],
                 outline = kargs['outline']
+            )
+        else:
+            return canvas.create_line(
+                x1, y1, x1 - 1, y1 - 1,
+                fill = kargs['outline'],
             )
     else:
         pass
@@ -256,7 +263,7 @@ def paint(event=None):
 #end paint(event=None)
 
 #resets the line start
-def reset(event):
+def reset(event=None):
     #reference variables outside function
     global actions
     global current
@@ -273,16 +280,23 @@ def reset(event):
     global stroke
     global strokeType
 
+    #set the mouse down location
+    if event is None:
+        firstX = previousX
+        firstY = previousY
+    else:
+        firstX = event.x
+        firstY = event.y
+
     #set the mouse down detector
     mouse = True
 
-    #set the mouse down location
-    firstX = event.x
-    firstY = event.y
-    
     #adds a point to the polygon
     if (strokeType in ('polygon', 'filled polygon')):
-        pastPoints.extend((event.x, event.y))
+        pastPoints.extend((firstX, firstY))
+    else:
+        #update current stroke if not polygon
+        stroke += 1; actions.append([])
 
     #update saved
     saved = False
@@ -290,47 +304,45 @@ def reset(event):
     #update title
     window.title(('*Primitive Paint - ' + fileName))
 
-    #update current stroke if not polygon
-    if (strokeType not in ('polygon', 'filled polygon')):
-        stroke += 1; actions.append([])
-
     #empty redo list
     if (len(redo) > 1):
-        redo = [[]]
+        del redo[1:]
 
     #draws starting dot of selected size
     if (strokeType in ('pen')):
         #circle shape
         actions[stroke].append(canvasShape(
-            event.x, event.y,
-            shape = ('circle'
+            firstX, firstY,
+            shape = 'circle'
             if (sizePen.get() != 2)
-            else 'square'),
+            else 'square',
             fill = current,
             size = sizePen.get()
         ))
         #size five fixes
         if (sizePen.get() == 5):
             actions[stroke].append(canvasShape(
-                event.x + 1, event.y,
+                firstX + 1, firstY,
                 shape = 'circle',
                 fill = current,
                 size = 4
             ))
 
-    #call the outline function
-    outline(event)
-
     #update line start for next line
-    previousX = event.x
-    previousY = event.y
-#end reset(event)
+    previousX = firstX
+    previousY = firstY
+
+    #call the outline function
+    outline()
+#end reset(event=None)
 
 #button release detector
-def end(event):
+def end(event=None):
     #reference variables outside function
     global actions
     global current
+    global firstX
+    global firstY
     global mouse
     global previousX
     global previousY
@@ -341,6 +353,14 @@ def end(event):
     #declaration of internal variables
     currentX = int()
     currentY = int()
+
+    #if event isnt there, use previous x and y positions
+    if event is None:
+        currentX = previousX
+        currentY = previousY
+    else:
+        currentX = event.x
+        currentY = event.y
 
     #reset the mouse down detector
     mouse = False
@@ -358,14 +378,14 @@ def end(event):
         #finish line
         actions[stroke].append(canvasShape(
             firstX, firstY,
-            event.x, event.y,
+            currentX, currentY,
             shape = 'line',
             fill = current,
             size = sizePen.get()
         ))
         #finish end dot
         actions[stroke].append(canvasShape(
-            event.x, event.y,
+            currentX, currentY,
             shape = 'circle'
             if (sizePen.get() != 2)
             else 'square',
@@ -375,7 +395,7 @@ def end(event):
         #size five fixes
         if (sizePen.get() == 5):
             actions[stroke].append(canvasShape(
-                event.x + 1, event.y,
+                currentX + 1, currentY,
                 shape = 'circle',
                 fill = current,
                 size = 4
@@ -383,7 +403,7 @@ def end(event):
     elif (strokeType in ('oval', 'filled oval')):
         actions[stroke].append(canvasShape(
             firstX, firstY,
-            event.x, event.y,
+            currentX, currentY,
             shape = 'oval',
             fill = current
             if (strokeType == 'filled oval')
@@ -394,30 +414,30 @@ def end(event):
     elif (strokeType in ('rectangle', 'filled rectangle')):
         actions[stroke].append(canvasShape(
             firstX, firstY,
-            event.x, event.y,
+            currentX, currentY,
             shape = 'rectangle'
-            if ((event.x - firstX != 0)
-                and (event.y - firstY != 0))
+            if ((currentX - firstX != 0)
+                and (currentY - firstY != 0))
             else 'square',
             fill = current
             if ((strokeType == 'filled rectangle')
-                or ((firstX == event.x)
-                and (firstY == event.y)))
+                or ((firstX == currentX)
+                and (firstY == currentY)))
             else '',
             outline = current,
             size = sizePen.get()
         ))
 
     #call the outline function
-    outline(event)
+    outline()
 
     #update line start for next line
-    previousX = event.x
-    previousY = event.y
-#end end(event)
+    previousX = currentX
+    previousY = currentY
+#end end(event=None)
 
 #right click detector function
-def finish(event):
+def finish(event=None):
     #reference variables outside function
     global actions
     global current
@@ -426,14 +446,15 @@ def finish(event):
     global stroke
     global strokeType
 
-    #increase stroke amount
-    stroke += 1; actions.append([])
-
     #check if stroke type is polygon or filled polygon
     if (strokeType not in ('polygon', 'filled polygon')): return
 
     #check if there's actually points in the polygon
     if ((len(pastPoints) > 1) and (len(pastPoints)%2 == 0)):
+        #increase stroke amount
+        stroke += 1; actions.append([])
+
+        #add the polygon
         if (len(pastPoints) == 2):
             #make a point
             actions[stroke].append(canvasShape(
@@ -445,8 +466,20 @@ def finish(event):
         elif (len(pastPoints) == 4):
             #make a line
             actions[stroke].append(canvasShape(
-                *pastPoints,
-                shape = 'line',
+                *pastPoints[0:2],
+                shape = 'circle',
+                fill = current,
+                size = sizePen.get()
+            ))
+            actions[stroke].append(canvasShape(
+                *pastPoints, *pastPoints[2:4],
+                shape = 'polygon',
+                fill = current,
+                size = sizePen.get()
+            ))
+            actions[stroke].append(canvasShape(
+                *pastPoints[2:4],
+                shape = 'circle',
                 fill = current,
                 size = sizePen.get()
             ))
@@ -465,8 +498,8 @@ def finish(event):
         del pastPoints[:]
 
     #call the outline function
-    outline(event)
-#end finish(event)
+    outline()
+#end finish(event=None)
 
 #mouse motion detector function
 def outline(event=None):
@@ -617,18 +650,24 @@ def outline(event=None):
     #update screen
     canvas.update()
     
-    #update status
+    #update current mouse location
+    statusX.set(str(currentX))
+    statusY.set(str(currentY))
+    statusMouseX.config(width = len(statusX.get()))
+    statusMouseY.config(width = len(statusY.get()))
+    
+    #update last mouse down location
     if (strokeType not in ('polygon', 'filled polygon')):
-        statusX.set(str(currentX))
-        statusY.set(str(currentY))
         statusLast.config(text = f'{firstX}, {firstY}' if mouse else '')
     elif (strokeType in ('polygon', 'filled polygon')):
-        statusX.set(str(currentX))
-        statusY.set(str(currentY))
         statusLast.config(
             text = f'{pastPoints[-2]}, {pastPoints[-1]}'
             if pastPoints else ''
         )
+
+    #update mouse down status
+    if mouse: statusMouseDown.config(bg = '#CCCCCC')
+    else: statusMouseDown.config(bg = 'SystemButtonFace')
 #end outline(event=None)
 
 #changes colour with a popup
@@ -645,10 +684,13 @@ def colourChange(*args):
 
     #update display
     display.config(bg = current)
+
+    #call outline maker
+    outline()
 #end colourChange(*args)
 
 #resize with the scrollwheel
-def resize(event):
+def resize(event=None):
     #reference variables outside function
     global mouse
     global sizePen
@@ -656,16 +698,128 @@ def resize(event):
     #scroll up to increase, down to decrease
     if ((event.delta == -120) and (sizeChoose.get() < 100)):
         sizeChoose.set(sizePen.get() + 1)
-        if mouse: paint()
+        if event and mouse: paint()
     elif ((event.delta == 120) and (sizeChoose.get() > 1)):
         sizeChoose.set(sizePen.get() - 1)
 
     #call the outline function
-    outline()
+    if event: outline()
 
     #set size to the scale's setting just in case
     sizePen.set(sizeChoose.get())
 #end resize(event)
+
+#mouse entered canvas
+def entry(event):
+    #reference variables outside function
+    global mouse
+    
+    #reset mouse down
+    mouse = False
+    
+    #call outline maker
+    outline(event)
+#end entry(event)
+
+#check status positions
+def statusCheck(*args):
+    #reference variables outside function
+    global previousX
+    global previousY
+    global statusPreX
+    global statusPreY
+
+    #change value into integer or empty
+    if (statusX.get() == ''):
+        statusX.set('')
+        previousX = 0
+        statusPreX = ''
+    else:
+        try:
+            statusX.set(abs(int(statusX.get())))
+            statusPreX = statusX.get()
+            previousX = int(statusX.get())
+        except: statusX.set(statusPreX)
+    if (statusY.get() == ''):
+        statusY.set('')
+        previousY = 0
+        statusPreY = ''
+    else:
+        try:
+            statusY.set(abs(int(statusY.get())))
+            statusPreY = statusY.get()
+            previousY = int(statusY.get())
+        except: statusY.set(statusPreY)
+
+    #update size of the entry boxes
+    if (statusMouseX['state'] == 'disabled'):
+        statusMouseX.config(width = max((len(statusX.get())), 1))
+    else: statusMouseX.config(width = max((len(statusX.get())), 5))
+    if (statusMouseY['state'] == 'disabled'):
+        statusMouseY.config(width = max((len(statusY.get())), 1))
+    else: statusMouseY.config(width = max((len(statusY.get())), 5))
+#end statusCheck(*args)
+
+#update status position displays when mouse moved in or out
+def statusEntry(position, move):
+    #declaration of internal variables
+    newState = str()
+    newWidth = int()
+
+    #check what state the widget should be
+    if (move == 'in'): newState = 'normal'; newWidth = 5
+    elif (move == 'out'): newState = 'disabled'; newWidth = 1
+
+    #check which widget this is happening in
+    if (position == 'x'):
+        statusMouseX.config(state = newState)
+        statusMouseX.config(width = max((len(statusX.get())), newWidth))
+        if (statusX.get() == ''): statusX.set(0)
+    elif (position == 'y'):
+        statusMouseY.config(state = newState)
+        statusMouseY.config(width = max((len(statusY.get())), newWidth))
+        if (statusY.get() == ''): statusY.set(0)
+#end statusEntry(position, move)
+
+#simulate mouse down, release, and right click
+def toggleDown(button):
+    #reference variables outside function
+    global mouse
+
+    #declaration of internal variables
+    bgOn = '#CCCCCC'
+    bgOff = 'SystemButtonFace'
+
+    #toggle mouse if not right click
+    if (button == 1): mouse = not mouse
+
+    #toggle backgrounds
+    if mouse: statusMouseDown.config(bg = bgOn)
+    else: statusMouseDown.config(bg = bgOff)
+    
+    #update previous mouse positions to entry widgets
+    previousX = statusMouseX.get()
+    previousY = statusMouseY.get()
+
+    #if stroke type is line, oval, or rectangle, update when down and up
+    #otherwise, update when it is down
+    if (strokeType in (
+        'line', 
+        'oval', 'filled oval',
+        'rectangle', 'filled rectangle'
+    )):
+        if ((button == 1) and mouse): reset()
+        elif (button == 1): end()
+    elif (strokeType in (
+        'pen',
+        'polygon', 'filled polygon'
+    )):
+        if ((button == 1) and mouse): reset()
+        elif ((button == 3) and (strokeType not in ('pen'))): finish()
+
+    #call outline maker
+    outline()
+#end toggleDown(*args)
 
 #change drawing type
 def strokeChange(position):
@@ -1158,8 +1312,9 @@ canvas.bind('<Button-1>', reset)
 canvas.bind('<Button-3>', finish)
 canvas.bind('<B1-Motion>', paint)
 canvas.bind('<ButtonRelease-1>', end)
-canvas.bind('<MouseWheel>', resize)
+window.bind('<MouseWheel>', resize)
 canvas.bind('<Motion>', outline)
+canvas.bind('<Enter>', entry)
 
 #undo stroke with Ctrl + Z and undo single with Ctrl + Shift + Z
 window.bind('<Control-z>', undoLast)
@@ -1367,7 +1522,7 @@ status.grid(
 #create the precision mouse controller and put on bottom left
 statusControl = tk.Frame(
     status,
-    width = 71,
+    width = 142,
     borderwidth = 0,
     relief = 'solid'
 )
@@ -1376,55 +1531,90 @@ statusControl.grid(
     row = 0,
     sticky = 'nsew'
 )
-
-#create the status text labels
-statusMouseX = tk.Entry(
+statusMouseControl = tk.Frame(
     statusControl,
-    state = 'disabled',
-    width = 4,
+    padx = 7,
     borderwidth = 0,
-    relief = 'flat',
+    relief = 'solid'
+)
+statusMouseControl.grid(column = 0, row = 0, sticky = 'nsew')
+
+#create the status text entries, canvas, and labels
+statusMouseX = tk.Entry(
+    statusMouseControl,
+    state = 'disabled',
+    width = 1,
+    disabledforeground = '#000000',
+    borderwidth = 0,
+    relief = 'solid',
     textvariable = statusX
 )
 statusMouseX.grid(column = 0, row = 0, sticky = 'nsew')
 statusMouseSplit = tk.Label(
-    statusControl,
+    statusMouseControl,
     text = ', ',
     padx = 0,
     borderwidth = 0,
-    relief = 'flat'
+    relief = 'solid'
 )
 statusMouseSplit.grid(column = 1, row = 0, sticky = 'nsew')
 statusMouseY = tk.Entry(
-    statusControl,
+    statusMouseControl,
     state = 'disabled',
-    width = 4,
+    width = 1,
+    disabledforeground = '#000000',
     borderwidth = 0,
-    relief = 'flat',
+    relief = 'solid',
     textvariable = statusY
 )
 statusMouseY.grid(column = 2, row = 0, sticky = 'nsew')
-statusMouseEnd = tk.Label(statusControl, borderwidth = 0, relief = 'flat')
-statusMouseEnd.grid(column = 3, row = 0, sticky = 'nsew')
+statusMouseDown = tk.Canvas(
+    statusControl,
+    width = 20,
+    height = 10,
+    bg = 'SystemButtonFace',
+    borderwidth = 1,
+    relief = 'solid'
+)
+statusMouseDown.grid(column = 1, row = 0, sticky = 'new')
+statusMouseEnd = tk.Label(
+    statusControl,
+    text = ' ',
+    borderwidth = 0,
+    relief = 'solid'
+)
+statusMouseEnd.grid(column = 2, row = 0, sticky = 'nsew')
 statusLast = tk.Label(
     status,
     text = '',
     anchor = 'w',
     padx = 5,
     borderwidth = 0,
-    relief = 'flat'
+    relief = 'solid'
 )
 statusLast.grid(column = 1, row = 0, sticky = 'nsew')
-statusEnd = tk.Label(status, borderwidth = 0, relief = 'flat')
+statusEnd = tk.Label(status, borderwidth = 0, relief = 'solid')
 statusEnd.grid(column = 2, row = 0, sticky = 'nsew')
+
+#add bindings to status bar and its variables
+statusX.trace('w', statusCheck)
+statusY.trace('w', statusCheck)
+statusMouseX.bind('<Enter>', lambda x: statusEntry('x', 'in'))
+statusMouseY.bind('<Enter>', lambda x: statusEntry('y', 'in'))
+statusMouseX.bind('<Leave>', lambda x: statusEntry('x', 'out'))
+statusMouseY.bind('<Leave>', lambda x: statusEntry('y', 'out'))
+statusMouseDown.bind('<Button-1>', lambda x: toggleDown(1))
+statusMouseDown.bind('<Button-3>', lambda x: toggleDown(3))
 
 #let window resize once possible
 window.columnconfigure(1, weight = 1)
 window.rowconfigure(1, weight = 1)
 canvas.columnconfigure(1, weight = 1)
 canvas.rowconfigure(1, weight = 1)
-status.columnconfigure(1, weight = 1)
-statusControl.columnconfigure(3, weight = 1)
+status.columnconfigure(0, minsize = 142)
+status.columnconfigure(2, weight = 1)
+statusControl.columnconfigure(0, minsize = 71)
+statusControl.columnconfigure(2, weight = 1)
 
 #loop until the end of the window's life
 tk.mainloop()
