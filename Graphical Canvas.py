@@ -1297,8 +1297,10 @@ topMenu = tk.Menu(window)
 window.config(menu = topMenu)
 fileMenu = tk.Menu(topMenu)
 editMenu = tk.Menu(topMenu)
+helpMenu = tk.Menu(topMenu)
 topMenu.add_cascade(label = 'File', menu = fileMenu)
 topMenu.add_cascade(label = 'Edit', menu = editMenu)
+topMenu.add_cascade(label = 'Help', menu = helpMenu)
 
 #create the file menu dropdown
 fileMenu.add_command(label = 'New', command = clearAll)
@@ -1318,6 +1320,12 @@ fileMenu.add_command(label = 'Exit', command = closeWindow)
 editMenu.add_command(label = 'Undo', command = undoLast)
 editMenu.add_command(label = 'Redo', command = redoLast)
 editMenu.add_command(label = 'Redo All', command = redoAll)
+
+#create the help menu dropdown
+helpMenu.add_command(label = 'About', command = lambda *args: tkmessage.showinfo(
+    'Primitive Paint - About',
+    f'Version Alpha {VERSION}'
+))
 
 #paint when clicked, resize when scrolled, end polygon when right clicked
 canvas.bind('<Button-1>', reset)
@@ -1542,7 +1550,7 @@ statusMouseControl = tk.Frame(
     borderwidth = 0,
     relief = 'solid'
 )
-statusMouseControl.grid(column = 0, row = 0, sticky = 'nsew')
+statusMouseControl.grid(column = 0, row = 0, sticky = 'new')
 
 #create the status text entries, canvas, and labels
 statusMouseX = tk.Entry(
@@ -1597,7 +1605,7 @@ statusLast = tk.Label(
     borderwidth = 0,
     relief = 'solid'
 )
-statusLast.grid(column = 1, row = 0, sticky = 'nsew')
+statusLast.grid(column = 1, row = 0, sticky = 'new')
 statusEnd = tk.Label(status, borderwidth = 0, relief = 'solid')
 statusEnd.grid(column = 2, row = 0, sticky = 'nsew')
 
@@ -1617,8 +1625,10 @@ window.rowconfigure(1, weight = 1)
 canvas.columnconfigure(1, weight = 1)
 canvas.rowconfigure(1, weight = 1)
 status.columnconfigure(0, minsize = 142)
+status.rowconfigure(0, minsize = 22)
 status.columnconfigure(2, weight = 1)
 statusControl.columnconfigure(0, minsize = 71)
+statusControl.rowconfigure(0, minsize = 22)
 statusControl.columnconfigure(2, weight = 1)
 
 #loop until the end of the window's life
